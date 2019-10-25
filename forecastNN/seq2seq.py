@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from tensorflow import keras
+import matplotlib.pyplot as plt
 
 
 class Seq2SeqForecaster(keras.models.Sequential):
@@ -55,6 +56,26 @@ class Seq2SeqForecaster(keras.models.Sequential):
 
         return history
 
-    def plot_history(self, history_step=0):
-        # plot_data = self.fit_history[-1 - history_step]
-        raise NotImplementedError
+    @staticmethod
+    def _loss_df(history):
+        num_epochs = len(history.history['loss'])
+
+        return pd.DataFrame(history.history, index=range(1, num_epochs + 1)), num_epochs
+
+    def plot_history(self, ax=None):
+        if ax is None:
+            _, ax = plt.subplots()
+
+        losses, fit_lengths = zip(
+            *[self._loss_df(history) for history in self.fit_history]
+        )
+
+        plot_df = pd.concat(losses).reset_index(drop=True)
+        plot_df.index += 1
+
+        plot_df.plot(ax=ax, marker='.')
+
+        for fit_marker in np.cumsum(fit_lengths)[:-1]:
+            ax.axvline(fit_marker, zorder=-1, color='k', alpha=0.5, ls='dashed')
+
+        return ax
