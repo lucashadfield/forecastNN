@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 
 
 class Seq2SeqForecaster(keras.models.Sequential):
+    figsize = (10, 5)
+
     def __init__(self, pred_steps: int, nn_width: int = 20, nn_depth: int = 2):
         super().__init__(self._build_model(pred_steps, nn_width, nn_depth))
         self.pred_steps = pred_steps
@@ -56,6 +58,12 @@ class Seq2SeqForecaster(keras.models.Sequential):
 
         return history
 
+    def predict_df(self, df: pd.DataFrame, last_only: bool = True):
+        pred_input = df.values.reshape(*df.shape, 1)
+        preds = self.predict(pred_input)
+
+        return preds[:, -1, :] if last_only else preds
+
     @staticmethod
     def _loss_df(history):
         num_epochs = len(history.history['loss'])
@@ -64,7 +72,7 @@ class Seq2SeqForecaster(keras.models.Sequential):
 
     def plot_history(self, ax=None):
         if ax is None:
-            _, ax = plt.subplots()
+            _, ax = plt.subplots(figsize=self.figsize)
 
         losses, fit_lengths = zip(
             *[self._loss_df(history) for history in self.fit_history]
@@ -77,5 +85,36 @@ class Seq2SeqForecaster(keras.models.Sequential):
 
         for fit_marker in np.cumsum(fit_lengths)[:-1]:
             ax.axvline(fit_marker, zorder=-1, color='k', alpha=0.5, ls='dashed')
+
+        return ax
+
+    def plot_example_fit(self, df: pd.DataFrame, ax=None, loc: int = 0):
+        if ax is None:
+            _, ax = plt.subplots(figsize=self.figsize)
+
+        preds = self.predict_df(df.loc[[loc]], last_only=False)
+
+        df.loc[loc].rename('Observations').plot(
+            ax=ax, color='C1', alpha=0.8, marker='.', lw=3, legend=True
+        )
+
+        for i, row in pd.DataFrame(preds[0, :, :]).iterrows():
+            tmp = row.copy()
+            tmp.index += i + 1
+
+            if i == len(preds[0]) - 1:
+                tmp.rename('Future Prediction').plot(
+                    ax=ax, color='C2', alpha=0.8, marker='.', lw=3, legend=True
+                )
+            elif i == len(preds[0]) - self.pred_steps - 1:
+                tmp.rename('Validation Prediction').plot(
+                    ax=ax, color='C0', alpha=0.8, marker='.', lw=3, legend=True
+                )
+            else:
+                tmp.rename('Partial Predictions').plot(
+                    ax=ax, color='k', alpha=0.2, legend=True if not i else False
+                )
+
+        ax.grid()
 
         return ax
