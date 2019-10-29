@@ -113,3 +113,47 @@ class Forecaster(keras.models.Sequential):
         ax.grid()
 
         return ax
+
+
+class MonteCarloForecaster(Forecaster):
+    def plot_example_fit(
+        self,
+        df: pd.DataFrame,
+        ax=None,
+        loc: int = 0,
+        mc_samples: int = 100,
+        nstd: float = 2.0,
+    ):
+        ax = super().plot_example_fit(df, ax, loc)
+
+        pred_input = df.values.reshape(*df.shape, 1)
+
+        mc_preds = np.stack(
+            [self(pred_input, training=True) for _ in range(mc_samples)]
+        )
+        print(mc_preds.shape)
+
+        mu = mc_preds.mean(axis=0)
+        std = mc_preds.std(axis=0)
+
+        n_steps = len(mc_preds[0, loc])
+
+        def fill_bounds(offset):
+            return (
+                mu[loc, offset, :] - nstd * std[loc, offset, :],
+                mu[loc, offset, :] + nstd * std[loc, offset, :],
+            )
+
+        ax.fill_between(
+            range(n_steps, n_steps + self.pred_steps),
+            *fill_bounds(-1),
+            color='C2',
+            alpha=0.3,
+        )
+
+        ax.fill_between(
+            range(n_steps - self.pred_steps, n_steps),
+            *fill_bounds(-self.pred_steps - 1),
+            color='C0',
+            alpha=0.3,
+        )

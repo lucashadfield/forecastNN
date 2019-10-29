@@ -1,5 +1,5 @@
 from tensorflow import keras
-from .base_forecaster import Forecaster
+from .base_forecasters import Forecaster
 
 
 class WaveNetForecaster(Forecaster):
